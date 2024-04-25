@@ -55,4 +55,3 @@ public class BushEncounter : MonoBehaviour
         // Here you would typically instantiate the creature, initiate a battle, etc.
     }
 }
-
