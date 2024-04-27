@@ -35,10 +35,10 @@ contract CreatureNFT is ERC721URIStorage, Ownable {
         emit CreatureMinted(newTokenId, player);
     }
 
-    function depositEther(uint256 tokenId) public payable {
+    function depositEtherToCreature(uint256 tokenId) public payable {
         require(ownerOf(tokenId) != address(0), "Creature does not exist.");
-        require(ownerOf(tokenId) == msg.sender, "Caller is not the owner.");
         etherBalances[tokenId] += msg.value;
+        increaseExperience(tokenId, msg.value);
         emit EtherDeposited(tokenId, msg.value, msg.sender);
     }
 
@@ -48,20 +48,41 @@ contract CreatureNFT is ERC721URIStorage, Ownable {
         require(etherBalances[tokenId] >= amount, "Insufficient balance.");
 
         etherBalances[tokenId] -= amount;
+        decreaseExperience(tokenId, amount);
         payable(msg.sender).transfer(amount);
         emit EtherWithdrawn(tokenId, amount, msg.sender);
     }
 
-    function safeTransferCreature(address from, address to, uint256 tokenId) public {
-        require(ownerOf(tokenId) != address(0), "Creature does not exist.");
-        require(ownerOf(tokenId) == msg.sender, "Caller is not the owner.");
-        
-        safeTransferFrom(from, to, tokenId);
-        uint256 balance = etherBalances[tokenId];
-        etherBalances[tokenId] = 0;
-        if (balance > 0) {
-            payable(to).transfer(balance);
+    function increaseExperience(uint256 tokenId, uint256 ethAmount) internal {
+        uint256 experienceToAdd = ethAmount * 100000;
+        creatureAttributes[tokenId].experience += experienceToAdd;
+        levelUp(tokenId);
+    }
+
+    function decreaseExperience(uint256 tokenId, uint256 ethAmount) internal {
+        uint256 experienceToSubtract = ethAmount * 100000;
+        if (creatureAttributes[tokenId].experience > experienceToSubtract) {
+            creatureAttributes[tokenId].experience -= experienceToSubtract;
+        } else {
+            creatureAttributes[tokenId].experience = 0;
         }
-        emit CreatureTraded(tokenId, from, to);
+        levelUp(tokenId);
+    }
+
+    function levelUp(uint256 tokenId) internal {
+        while (creatureAttributes[tokenId].level < 10 && 
+               creatureAttributes[tokenId].experience >= getNextLevelExperience(creatureAttributes[tokenId].level)) {
+            creatureAttributes[tokenId].level++;
+            emit LevelUp(tokenId, creatureAttributes[tokenId].level);
+        }
+    }
+
+    function getNextLevelExperience(uint256 currentLevel) public pure returns (uint256) {
+        return (currentLevel + 1) * (currentLevel + 1) * 100000;
+    }
+
+    // Fallback function to accept ETH when sent to the contract address directly
+    receive() external payable {
+        emit EtherDeposited(0, msg.value, msg.sender);  // tokenId is 0 as no specific NFT is targeted
     }
 }
